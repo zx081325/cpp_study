@@ -1,3 +1,11 @@
-#include "../core/test.h"
+#include <iostream>
+#include "base64.h"
+#include "bsearch.h"
+using namespace std;
 
-/* This file is to ensure test.h compiles on its own. */
+int main() {
+  Base64::runTests();
+  BSearch::runTests();
+  Global::pauseForKey();
+  return 0;
+}

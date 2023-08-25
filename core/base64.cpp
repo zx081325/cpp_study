@@ -1,11 +1,13 @@
 #include "../core/base64.h"
-
 #include <cctype>
 #include "../core/test.h"
 
 using namespace std;
 
+// Base64 字符表
 static const char* base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// Base64 解码表，将Base64字符映射到其对应的数值
 static constexpr int decodeTable[128] = {
   -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1,
@@ -17,6 +19,7 @@ static constexpr int decodeTable[128] = {
   41,42,43,44,45,46,47,48, 49,50,51,-1,-1,-1,-1,-1
 };
 
+// Base64 编码函数
 string Base64::encode(const string& s) {
   string result;
   size_t size = s.size();
@@ -26,11 +29,13 @@ string Base64::encode(const string& s) {
     int c1 = (int)((i+1 < size) ? s[i+1] : '\0') & 0xff;
     int c2 = (int)((i+2 < size) ? s[i+2] : '\0') & 0xff;
 
+    // 将原始字符转换成Base64字符对应的数值
     int e0 = c0 >> 2;
     int e1 = ((c0 & 0x3) << 4) | (c1 >> 4);
     int e2 = ((c1 & 0xf) << 2) | (c2 >> 6);
     int e3 = c2 & 0x3f;
 
+    // 将数值对应的Base64字符追加到结果字符串
     result += base64Chars[e0];
     result += base64Chars[e1];
     result += base64Chars[e2];
@@ -47,6 +52,7 @@ string Base64::encode(const string& s) {
   return result;
 }
 
+// Base64 解码函数
 string Base64::decode(const string& s) {
   string result;
   size_t size = s.size();
@@ -61,16 +67,17 @@ string Base64::decode(const string& s) {
       break;
     if(c < '+' || c > 'z')
       throw StringError(string("Base64::decode: invalid character ") + c);
+    // 获取Base64字符对应的数值
     int d = decodeTable[(int)c];
     if(d < 0)
       throw StringError(string("Base64::decode: invalid character ") + c);
-    // cout << "Got: " << c << " " << d << endl;
 
+    // 将数值合并到carry中
     carryNumBits += 6;
     carry = (carry << 6) | d;
     if(carryNumBits >= 8) {
+      // 提取8位字符并添加到结果字符串中
       int extracted = carry >> (carryNumBits-8);
-      // cout << "Extracted: " << extracted << endl;
       result += (char)extracted;
       carry = carry ^ (extracted << (carryNumBits-8));
       carryNumBits -= 8;
@@ -95,6 +102,7 @@ void Base64::runTests() {
     const char* name = "base64 tests";
     ostringstream out;
 
+    // 定义一个Lambda函数，用于将可打印字符输出，不可打印字符输出其ASCII码值
     auto safePrint = [&](const string& s) {
       for(size_t i = 0; i<s.size(); i++) {
         if(std::isprint(s[i]))
@@ -103,6 +111,8 @@ void Base64::runTests() {
           out << "(" << (int)s[i] << ")";
       }
     };
+
+    // 定义一个Lambda函数，用于运行Base64编解码测试
     auto runTest = [&](const string& s) {
       string encoded = encode(s);
       string decoded = decode(encoded);
@@ -110,6 +120,8 @@ void Base64::runTests() {
       safePrint(s);
       out << " : " << encoded << endl;
     };
+
+    // 定义一个Lambda函数，用于运行Base64解码测试
     auto runDecode = [&](const string& s) {
       try {
         string decoded = decode(s);
@@ -127,6 +139,7 @@ void Base64::runTests() {
       }
     };
 
+    // 依次运行各种测试用例
     runTest("");
     runTest("pleasure.");
     runTest("leasure.");
@@ -190,62 +203,63 @@ void Base64::runTests() {
     runDecode("YWJj!");
     runDecode("YWJjZGVm\n");
 
+    // 期望输出的结果
     string expected = R"%%(
- :
-pleasure. : cGxlYXN1cmUu
-leasure. : bGVhc3VyZS4=
-easure. : ZWFzdXJlLg==
-asure. : YXN1cmUu
-sure. : c3VyZS4=
-ure. : dXJlLg==
-re. : cmUu
-e. : ZS4=
-. : Lg==
-(-1) : /w==
-(-1)(1) : /wE=
-(-1)(1)(-1) : /wH/
-(-1)(1)(-1)(-1) : /wH//w==
-(-1)(1)(-1)(-1)(1) : /wH//wE=
-(-1)(1)(-1)(-1)(1)(-1) : /wH//wH/
-(-1)(1)(-1)(-1)(1)(-1)(-1) : /wH//wH//w==
-(-1)(1)(-1)(-1)(1)(-1)(-1)(-1) : /wH//wH///8=
-(-1)(1)(-1)(-1)(1)(-1)(-1)(-1)(1) : /wH//wH///8B
-(0)d(0)d : AGQAZA==
-YWJjZGVm -> abcdef
-YWJjZGVm= -> abcdef
-YWJjZGVm== -> abcdef
-YWJjZGVm=== -> abcdef
-YWJjZGU -> abcde
-YWJjZGU= -> abcde
-YWJjZGU== -> abcde
-YWJjZGU=== -> abcde
-YWJjZA -> abcd
-YWJjZA= -> abcd
-YWJjZA== -> abcd
-YWJjZA=== -> abcd
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. : TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEuIFV0IGVuaW0gYWQgbWluaW0gdmVuaWFtLCBxdWlzIG5vc3RydWQgZXhlcmNpdGF0aW9uIHVsbGFtY28gbGFib3JpcyBuaXNpIHV0IGFsaXF1aXAgZXggZWEgY29tbW9kbyBjb25zZXF1YXQuIER1aXMgYXV0ZSBpcnVyZSBkb2xvciBpbiByZXByZWhlbmRlcml0IGluIHZvbHVwdGF0ZSB2ZWxpdCBlc3NlIGNpbGx1bSBkb2xvcmUgZXUgZnVnaWF0IG51bGxhIHBhcmlhdHVyLiBFeGNlcHRldXIgc2ludCBvY2NhZWNhdCBjdXBpZGF0YXQgbm9uIHByb2lkZW50LCBzdW50IGluIGN1bHBhIHF1aSBvZmZpY2lhIGRlc2VydW50IG1vbGxpdCBhbmltIGlkIGVzdCBsYWJvcnVtLg==
-YWJjZB= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZC= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZD= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZE= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZF= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZG= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZH= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZI= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZJ= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZK= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZL= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZM= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZN= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZO= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZP= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJjZQ= -> abce
-YWJjZR= error: Base64::decode: unexpected end of decode, carry is nonzero
-YWJj! error: Base64::decode: invalid character !
-YWJjZGVm(10) error: Base64::decode: invalid character
-)%%";
-    TestCommon::expect(name,out,expected);
+    :
+	pleasure. : cGxlYXN1cmUu
+	leasure. : bGVhc3VyZS4=
+	easure. : ZWFzdXJlLg==
+	asure. : YXN1cmUu
+	sure. : c3VyZS4=
+	ure. : dXJlLg==
+	re. : cmUu
+	e. : ZS4=
+	. : Lg==
+	(-1) : /w==
+	(-1)(1) : /wE=
+	(-1)(1)(-1) : /wH/
+	(-1)(1)(-1)(-1) : /wH//w==
+	(-1)(1)(-1)(-1)(1) : /wH//wE=
+	(-1)(1)(-1)(-1)(1)(-1) : /wH//wH/
+	(-1)(1)(-1)(-1)(1)(-1)(-1) : /wH//wH//w==
+	(-1)(1)(-1)(-1)(1)(-1)(-1)(-1) : /wH//wH///8=
+	(-1)(1)(-1)(-1)(1)(-1)(-1)(-1)(1) : /wH//wH///8B
+	(0)d(0)d : AGQAZA==
+	YWJjZGVm -> abcdef
+	YWJjZGVm= -> abcdef
+	YWJjZGVm== -> abcdef
+	YWJjZGVm=== -> abcdef
+	YWJjZGU -> abcde
+	YWJjZGU= -> abcde
+	YWJjZGU== -> abcde
+	YWJjZGU=== -> abcde
+	YWJjZA -> abcd
+	YWJjZA= -> abcd
+	YWJjZA== -> abcd
+	YWJjZA=== -> abcd
+  Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. : TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdCwgc2VkIGRvIGVpdXNtb2QgdGVtcG9yIGluY2lkaWR1bnQgdXQgbGFib3JlIGV0IGRvbG9yZSBtYWduYSBhbGlxdWEuIFV0IGVuaW0gYWQgbWluaW0gdmVuaWFtLCBxdWlzIG5vc3RydWQgZXhlcmNpdGF0aW9uIHVsbGFtY28gbGFib3JpcyBuaXNpIHV0IGFsaXF1aXAgZXggZWEgY29tbW9kbyBjb25zZXF1YXQuIER1aXMgYXV0ZSBpcnVyZSBkb2xvciBpbiByZXByZWhlbmRlcml0IGluIHZvbHVwdGF0ZSB2ZWxpdCBlc3NlIGNpbGx1bSBkb2xvcmUgZXUgZnVnaWF0IG51bGxhIHBhcmlhdHVyLiBFeGNlcHRldXIgc2ludCBvY2NhZWNhdCBjdXBpZGF0YXQgbm9uIHByb2lkZW50LCBzdW50IGluIGN1bHBhIHF1aSBvZmZpY2lhIGRlc2VydW50IG1vbGxpdCBhbmltIGlkIGVzdCBsYWJvcnVtLg==
+	YWJjZB= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZC= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZD= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZE= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZF= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZG= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZH= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZI= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZJ= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZK= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZL= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZM= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZN= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZO= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZP= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJjZQ= -> abce
+	YWJjZR= error: Base64::decode: unexpected end of decode, carry is nonzero
+	YWJj! error: Base64::decode: invalid character !
+	YWJjZGVm(10) error: Base64::decode: invalid character
+	)%%";
+
+    // 比较实际输出和期望输出是否相符
+    TestCommon::expect(name, out, expected);
   }
-
 }
-
