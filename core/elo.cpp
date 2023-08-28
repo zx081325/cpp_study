@@ -132,146 +132,67 @@ vector<double> ComputeElos::computeApproxEloStdevs(
   return eloStdevs;
 }
 
-//MM algorithm
-/*
+// 计算Elo评分
 vector<double> ComputeElos::computeElos(
-  const ComputeElos::WLRecord* winMatrix,
-  int numPlayers,
-  double priorWL,
-  int maxIters,
-  double tolerance,
-  ostream* out
+  const ComputeElos::WLRecord* winMatrix, // 胜负记录
+  int numPlayers, // 玩家数量
+  double priorWL, // 先验水平
+  int maxIters, // 最大迭代次数 
+  double tolerance, // 容差
+  ostream* out // 输出流
 ) {
-  vector<double> logGammas(numPlayers,0.0);
 
-  vector<double> numWins(numPlayers,0.0);
-  for(int x = 0; x<numPlayers; x++) {
-    for(int y = 0; y<numPlayers; y++) {
-      if(x == y)
-        continue;
-      numWins[x] += winMatrix[x*numPlayers+y].firstWins;
-      numWins[y] += winMatrix[x*numPlayers+y].secondWins;
-    }
-  }
+  vector<double> elos(numPlayers,0.0); // Elo分数组
 
-  vector<double> matchLogGammaSums(numPlayers*numPlayers);
-  vector<double> priorMatchLogGammaSums(numPlayers);
-
-  auto recomputeLogGammaSums = [&]() {
-    for(int x = 0; x<numPlayers; x++) {
-      for(int y = 0; y<numPlayers; y++) {
-        if(x == y)
-          continue;
-        double maxLogGamma = std::max(logGammas[x],logGammas[y]);
-        matchLogGammaSums[x*numPlayers+y] = maxLogGamma + log(exp(logGammas[x] - maxLogGamma) + exp(logGammas[y] - maxLogGamma));
-      }
-      double maxLogGamma = std::max(logGammas[x],0.0);
-      priorMatchLogGammaSums[x] = maxLogGamma + log(exp(logGammas[x] - maxLogGamma) + exp(0.0 - maxLogGamma));
-    }
-  };
+  // 常规无梯度算法
+  vector<double> nextDelta(numPlayers,100.0); 
 
   auto iterate = [&]() {
-    recomputeLogGammaSums();
-
+    
     double maxEloDiff = 0;
     for(int x = 0; x<numPlayers; x++) {
-      double oldLogGamma = logGammas[x];
+    
+      double oldElo = elos[x]; // 原Elo分
+      double hiElo = oldElo + nextDelta[x]; // 高分
+      double loElo = oldElo - nextDelta[x]; // 低分
 
-      double sumInvDifficulty = 0.0;
-      for(int y = 0; y<numPlayers; y++) {
-        if(x == y)
-          continue;
-        double numGamesXY = winMatrix[x*numPlayers+y].firstWins + winMatrix[x*numPlayers+y].secondWins;
-        double numGamesYX = winMatrix[y*numPlayers+x].firstWins + winMatrix[y*numPlayers+x].secondWins;
-        sumInvDifficulty += numGamesXY / exp(matchLogGammaSums[x*numPlayers+y] - oldLogGamma);
-        sumInvDifficulty += numGamesYX / exp(matchLogGammaSums[y*numPlayers+x] - oldLogGamma);
-      }
-      sumInvDifficulty += priorWL / exp(priorMatchLogGammaSums[x] - oldLogGamma);
-      sumInvDifficulty += priorWL / exp(priorMatchLogGammaSums[x] - oldLogGamma);
-
-      double logGammaDiff = log((numWins[x] + priorWL) / sumInvDifficulty);
-      double newLogGamma = oldLogGamma + logGammaDiff;
-      logGammas[x] = newLogGamma;
-
-      double eloDiff = ELO_PER_LOG_GAMMA * std::fabs(logGammaDiff);
-      maxEloDiff = std::max(eloDiff,maxEloDiff);
-    }
-    return maxEloDiff;
-  };
-
-  for(int i = 0; i<maxIters; i++) {
-    double maxEloDiff = iterate();
-    if(out != NULL && i % 50 == 0) {
-      (*out) << "Iteration " << i << " maxEloDiff = " << maxEloDiff << endl;
-    }
-    if(maxEloDiff < tolerance)
-      break;
-  }
-
-  vector<double> elos(numPlayers,0.0);
-  for(int x = 0; x<numPlayers; x++) {
-    elos[x] = ELO_PER_LOG_GAMMA * logGammas[x];
-  }
-  return elos;
-}
-*/
-
-
-vector<double> ComputeElos::computeElos(
-  const ComputeElos::WLRecord* winMatrix,
-  int numPlayers,
-  double priorWL,
-  int maxIters,
-  double tolerance,
-  ostream* out
-) {
-  vector<double> elos(numPlayers,0.0);
-
-
-  //General gradient-free algorithm
-  vector<double> nextDelta(numPlayers,100.0);
-  auto iterate = [&]() {
-    double maxEloDiff = 0;
-    for(int x = 0; x<numPlayers; x++) {
-      double oldElo = elos[x];
-      double hiElo = oldElo + nextDelta[x];
-      double loElo = oldElo - nextDelta[x];
-
+      // 计算对数似然
       double likelihood = computeLocalLogLikelihood(x, elos, winMatrix, numPlayers, priorWL);
-      elos[x] = hiElo;
+      
+      // 尝试高低分判断
+      elos[x] = hiElo; 
       double likelihoodHi = computeLocalLogLikelihood(x, elos, winMatrix, numPlayers, priorWL);
+
       elos[x] = loElo;
       double likelihoodLo = computeLocalLogLikelihood(x, elos, winMatrix, numPlayers, priorWL);
 
-      if (likelihoodHi > likelihood)
-      {
+      // 调整Elo和delta
+      if (likelihoodHi > likelihood) {
         elos[x] = hiElo;
         nextDelta[x] *= 1.1;
-      }
-      else if (likelihoodLo > likelihood)
-      {
+      } else if (likelihoodLo > likelihood) {
         elos[x] = loElo;
         nextDelta[x] *= 1.1;
-      }
-      else
-      {
+      } else {
         elos[x] = oldElo;
         nextDelta[x] *= 0.8;
       }
 
+      // 记录最大变化
       double eloDiff = nextDelta[x];
-      maxEloDiff = std::max(eloDiff, maxEloDiff);
+      maxEloDiff = max(eloDiff, maxEloDiff);
     }
+    
     return maxEloDiff;
   };
 
-  for (int i = 0; i < maxIters; i++)
-  {
+  // 迭代计算
+  for (int i = 0; i < maxIters; i++) {
     double maxEloDiff = iterate();
 
-    if (out != NULL && i % 50 == 0)
-    {
-      (*out) << "Iteration " << i << " maxEloDiff = " << maxEloDiff << endl;
+    // 打印输出
+    if (out != NULL && i % 50 == 0) {
+      (*out) << "Iteration " << i << " maxEloDiff = " << maxEloDiff << endl; 
     }
     if (maxEloDiff < tolerance)
       break;

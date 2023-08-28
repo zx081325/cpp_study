@@ -11,24 +11,25 @@
 
 std::vector<std::string> MainArgs::getCommandLineArgsUTF8(int argc, const char* const* argv) {
 #ifdef OS_IS_WINDOWS
-  // Ignore argc and argv entirely and just call Windows-specific functions to get the full command line without
-  // losing information in the case of non-ascii input.
-  // Then convert to UTF8
-  LPWSTR commandLine = GetCommandLineW();
-  LPWSTR* argvWide = CommandLineToArgvW(commandLine,&argc);
-  std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+  // 如果是 Windows 环境
+  // 完全忽略 argc 和 argv，直接调用 Windows 特定的函数来获取完整的命令行，以避免在非 ASCII 输入的情况下丢失信息。
+  // 然后将其转换为 UTF8 编码
+  LPWSTR commandLine = GetCommandLineW(); // 获取完整命令行
+  LPWSTR* argvWide = CommandLineToArgvW(commandLine, &argc); // 转换为宽字符参数
+  std::wstring_convert<std::codecvt_utf8<wchar_t>> converter; // 创建 UTF-8 转换器
   std::vector<std::string> args;
   args.reserve(argc);
-  for(int i = 0; i<argc; i++)
-    args.push_back(converter.to_bytes(argvWide[i]));
-  return args;
+  for (int i = 0; i < argc; i++)
+    args.push_back(converter.to_bytes(argvWide[i])); // 将宽字符参数转换为 UTF-8 并存储
+  return args; // 返回 UTF-8 编码的命令行参数列表
 #else
-  // For non-Windows, for now assume we have UTF8. If we need to add a case for another OS here, we can do that later.
+  // 如果不是 Windows 环境，暂时假设使用 UTF-8 编码。
+  // 如果需要为其他操作系统添加处理逻辑，可以在这里添加。
   std::vector<std::string> args;
   args.reserve(argc);
-  for(int i = 0; i<argc; i++)
-    args.push_back(std::string(argv[i]));
-  return args;
+  for (int i = 0; i < argc; i++)
+    args.push_back(std::string(argv[i])); // 直接使用命令行参数，假设是 UTF-8 编码
+  return args; // 返回命令行参数列表
 #endif
 }
 
